@@ -2,6 +2,7 @@ from django.shortcuts import render
 from rest_framework import viewsets
 from .serializers import *
 from .models import *
+from rest_framework import generics
 # Create your views here.
 
 class MoviesApiViewSet(viewsets.ModelViewSet):
@@ -15,3 +16,10 @@ class PlatformApiViewSet(viewsets.ModelViewSet):
 class ReviewsApiViewSet(viewsets.ModelViewSet):
     serializer_class = ReviewSerializer
     queryset = Reviews.objects.all()
+    
+class ReviewsApiViewSetDetails(generics.ListAPIView):
+    serializer_class = ReviewSerializer
+
+    def get_queryset(self):
+        movie_id = self.kwargs['pk']
+        return Reviews.objects.filter(movie_id=movie_id)
