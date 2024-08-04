@@ -1,2 +1,2 @@
-.env
-IMDB.settings.py
+*.env
+IMDB/settings.py
