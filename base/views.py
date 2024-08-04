@@ -109,7 +109,7 @@ class VerifyOTP(APIView):
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
             
 class LoginView(APIView):
-    def post(self, request, *args, **kwargs):
+    def post(self, request):
         serializer = LoginSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         email = serializer.validated_data['email']
@@ -128,6 +128,8 @@ class LoginView(APIView):
             return Response({'detail': 'Invalid login credentials'}, status=status.HTTP_401_UNAUTHORIZED)
         
 
+from rest_framework_simplejwt.exceptions import TokenError, InvalidToken
+from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken
 class LogoutView(APIView):
     # For Logout in SimpleJWT, you should provide "access_token" in header with key => Authorization and value => Bearer <access_token>
     # then in Body and raw you should provide { "refresh" : "<refresh_token>"}
@@ -137,6 +139,7 @@ class LogoutView(APIView):
         try:
             # Extract the refresh token from the request data
             refresh_token = request.data.get("refresh")
+            access_token = request.headers.get('Authorization').split(' ')[1] if 'Authorization' in request.headers else None
             if not refresh_token:
                 return Response({"detail": "Refresh token is required."}, status=status.HTTP_400_BAD_REQUEST)
             
@@ -145,10 +148,62 @@ class LogoutView(APIView):
             
             # Blacklist the token to prevent it from being used again
             token.blacklist()
-            
+            if access_token:
+                BlacklistedToken.objects.create(token=access_token)
             # Return a successful response
             return Response({"detail": "Logout successful."}, status=status.HTTP_205_RESET_CONTENT)
         
-        except Exception as e:
+        except (TokenError, InvalidToken) as e:
             # Handle potential errors
             return Response({"detail": f"An error occurred: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
+        
+class WatchlistViewSet(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        watchlist = Watchlist.objects.filter(user=request.user)
+        serializer = WatchlistSerializer(watchlist, many=True)
+        return Response(serializer.data)
+
+    def post(self, request):
+        movie_id = request.data.get('movie')
+        if not movie_id:
+            return Response({'detail': 'Movie ID is required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            movie = Movies.objects.get(id=movie_id)
+        except Movies.DoesNotExist:
+            return Response({'detail': 'Movie not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        watchlist, created = Watchlist.objects.get_or_create(user=request.user, movie=movie)
+        if not created:
+            return Response({'detail': 'Movie already in watchlist'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        serializer = WatchlistSerializer(watchlist)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+    def delete(self, request):
+        movie_id = request.data.get('movie')
+        if not movie_id:
+            return Response({'detail': 'Movie ID is required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            watchlist_item = Watchlist.objects.get(user=request.user, movie_id=movie_id)
+        except Watchlist.DoesNotExist:
+            return Response({'detail': 'Movie not in watchlist'}, status=status.HTTP_404_NOT_FOUND)
+        
+        watchlist_item.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+    
+    def retrieve(self, request):
+        movie_id = request.data.get('movie')
+        if not movie_id:
+            return Response({'detail': 'Movie ID is required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            watchlist_item = Watchlist.objects.get(user=request.user, movie_id=movie_id)
+        except Watchlist.DoesNotExist:
+            return Response({'detail': 'Movie not in watchlist'}, status=status.HTTP_404_NOT_FOUND)
+        
+        serializer = WatchlistSerializer(watchlist_item)
+        return Response(serializer.data)

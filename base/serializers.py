@@ -62,3 +62,10 @@ class VerifyAccountSerializer(serializers.Serializer):
 class LoginSerializer(serializers.Serializer):
     email = serializers.EmailField()
     password = serializers.CharField()
+    
+class WatchlistSerializer(serializers.ModelSerializer):
+    movie = MovieSerializer()  # Assuming you have a MovieSerializer
+
+    class Meta:
+        model = Watchlist
+        fields = ['id', 'movie', 'added_on']

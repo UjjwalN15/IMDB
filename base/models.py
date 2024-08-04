@@ -91,3 +91,11 @@ class Reviews(models.Model):
         return (self.movie.title + ' => ' + str(self.ratings)+ '  rating')
     
     
+
+class Watchlist(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    movie = models.ForeignKey(Movies, on_delete=models.CASCADE)
+    added_on = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('user', 'movie')
