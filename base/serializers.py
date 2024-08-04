@@ -1,5 +1,7 @@
 from rest_framework import serializers
 from .models import *
+from .validators import validate_password, phone_validator
+from django.core.exceptions import ValidationError
 
 class PlatformSerializer(serializers.ModelSerializer):
     # For Hyperlinked movies
@@ -17,7 +19,7 @@ class ReviewSerializer(serializers.ModelSerializer):
         return representation
     class Meta:
         model = Reviews
-        fields = ['id','movie', 'email', 'full_name','ratings','comment']
+        fields = ['id','movie', 'email', 'full_name','ratings','comment','added_date']
         
     def validate_ratings(self, value):
         if value < 1 or value > 5:
@@ -35,3 +37,28 @@ class MovieSerializer(serializers.ModelSerializer):
         fields = ['id','title','description','rating','release_year','active','platform','added_date','updated_date']
     # platform = PlatformSerializer()
         
+class UserSerializer(serializers.ModelSerializer):
+    password = serializers.CharField(write_only=True, required=True)
+    phone = serializers.CharField(required=True, validators=[phone_validator])
+
+    class Meta:
+        model = User
+        fields = ('email', 'password', 'first_name', 'last_name', 'name', 'age', 'gender', 'address', 'phone', 'is_email_verified')
+
+    def validate_password(self, value):
+        try:
+            validate_password(value)
+        except ValidationError as e:
+            raise serializers.ValidationError(e.messages)
+        return value
+
+    def create(self, validated_data):
+        return User.objects.create_user(**validated_data)
+    
+class VerifyAccountSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    otp = serializers.CharField()
+    
+class LoginSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    password = serializers.CharField()
